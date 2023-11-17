@@ -1,6 +1,7 @@
 const { MongoClient, ServerApiVersion, ObjectId} = require("mongodb");
 const express = require("express");
 const cors = require("cors");
+require("dotenv").config();
 const port = process.env.PORT || 5000;
 
 const app = express();
@@ -10,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
-const uri = "mongodb+srv://gadgets-galaxy:hka45tLynfXzTzOj@junior.tpsklbw.mongodb.net/?retryWrites=true&w=majority";
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@junior.tpsklbw.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -40,8 +41,7 @@ async function run() {
         app.get("/products/:brand", async (req, res) => {
             const brand = req.params.brand;
             const query = {brand: brand};
-            const result = await gadgetsCollection.find(query);
-            const data = await result.toArray();
+            const data = await gadgetsCollection.find(query).toArray();
             res.send(data);
         });
 
@@ -73,21 +73,46 @@ async function run() {
         // post single item
         app.post("/cart", async (req, res) => {
             const cartData = req.body;
+            cartData._id = (new  ObjectId(cartData._id));
             const result = await cartItemsCollection.insertOne(cartData);
             res.send(result);
         });
 
+        app.get("/cart/:email", async (req, res) => {
+            const query = {};
+            if (req.params?.email) {
+                query.userEmail = req.params.email
+            }
+
+            let cartIds = await cartItemsCollection.find(query).toArray();
+            cartIds = cartIds.map(item => item._id);
+
+            const filter = {
+                _id: {
+                    $in: cartIds
+                }
+            };
+            const data = await gadgetsCollection.find(filter).toArray();
+            res.send(data);
+        });
+
         // get cart item
-        app.get("/cart", async (req, res) => {
-            const cursor = cartItemsCollection.find();
-            const result = await cursor.toArray();
-            res.send(result);
+        app.post("/cart-data", async (req, res) => {
+            let cartIds = req.body;
+            cartIds = cartIds.map(id => new ObjectId(id));
+            const query = {
+                _id: {
+                    $in: cartIds
+                }
+            };
+            const data = await gadgetsCollection.find(query).toArray();
+            res.send(data);
         });
 
         // delete single cart item
         app.delete("/cart/:id", async (req, res) => {
             const id = req.params.id;
-            const query = {_id: id};
+            const query = {_id: new ObjectId(id)};
             const result = await cartItemsCollection.deleteOne(query);
             res.send(result);
         });
